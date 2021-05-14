@@ -4,6 +4,7 @@ use crate::geometry::{
     ColliderChanges, ColliderHandle, ColliderMassProperties, ColliderParent, ColliderPosition,
     ColliderShape, InteractionGraph, RigidBodyGraphIndex,
 };
+use crate::gravity::Gravity;
 use crate::math::{AngVector, AngularInertia, Isometry, Point, Real, Translation, Vector};
 use crate::parry::partitioning::IndexedData;
 use crate::utils::{WCross, WDot};
@@ -512,8 +513,8 @@ impl RigidBodyForces {
 
     /// Adds to `self` the gravitational force that would result in a gravitational acceleration
     /// equal to `gravity`.
-    pub fn add_gravity_acceleration(&mut self, gravity: &Vector<Real>, mass: Real) {
-        self.force += gravity * self.gravity_scale * mass;
+    pub fn add_gravity_acceleration<G: Gravity>(&mut self, gravity: &G, mass: Real, position: &Isometry<Real>) {
+        self.force += gravity.force_at(position, mass, self.gravity_scale);
     }
 
     /// Applies a force at the given world-space point of the rigid-body with the given mass properties.

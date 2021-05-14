@@ -17,11 +17,12 @@ use crate::geometry::{
     ColliderHandle, ColliderMaterial, ColliderPair, ColliderParent, ColliderPosition,
     ColliderShape, ColliderType, ContactManifoldIndex, NarrowPhase,
 };
-use crate::math::{Real, Vector};
+use crate::math::Real;
 use crate::pipeline::{EventHandler, PhysicsHooks};
 
 #[cfg(feature = "default-sets")]
 use {crate::dynamics::RigidBodySet, crate::geometry::ColliderSet};
+use crate::gravity::Gravity;
 
 /// The physics pipeline, responsible for stepping the whole physics simulation.
 ///
@@ -209,9 +210,9 @@ impl PhysicsPipeline {
         }
     }
 
-    fn build_islands_and_solve_velocity_constraints<Bodies, Colliders>(
+    fn build_islands_and_solve_velocity_constraints<Bodies, Colliders, Gravity>(
         &mut self,
-        gravity: &Vector<Real>,
+        gravity: &Gravity,
         integration_parameters: &IntegrationParameters,
         islands: &mut IslandManager,
         narrow_phase: &mut NarrowPhase,
@@ -229,6 +230,7 @@ impl PhysicsPipeline {
             + ComponentSet<RigidBodyColliders>
             + ComponentSet<RigidBodyType>,
         Colliders: ComponentSetOption<ColliderParent>,
+        Gravity: self::Gravity,
     {
         self.counters.stages.island_construction_time.resume();
         islands.update_active_set_with_contacts(
@@ -271,7 +273,7 @@ impl PhysicsPipeline {
                 })
                 .unwrap();
             bodies.map_mut_internal(handle.0, |forces: &mut RigidBodyForces| {
-                forces.add_gravity_acceleration(&gravity, effective_inv_mass)
+                forces.add_gravity_acceleration(gravity, effective_inv_mass, &position)
             });
         }
         self.counters.stages.update_time.pause();
@@ -447,9 +449,9 @@ impl PhysicsPipeline {
     /// This is the same as `self.step_generic`, except that it is specialized
     /// to work with `RigidBodySet` and `ColliderSet`.
     #[cfg(feature = "default-sets")]
-    pub fn step(
+    pub fn step<Gravity>(
         &mut self,
-        gravity: &Vector<Real>,
+        gravity: &Gravity,
         integration_parameters: &IntegrationParameters,
         islands: &mut IslandManager,
         broad_phase: &mut BroadPhase,
@@ -460,7 +462,10 @@ impl PhysicsPipeline {
         ccd_solver: &mut CCDSolver,
         hooks: &dyn PhysicsHooks<RigidBodySet, ColliderSet>,
         events: &dyn EventHandler,
-    ) {
+    )
+    where
+        Gravity: self::Gravity,
+    {
         let mut modified_bodies = bodies.take_modified();
         let mut modified_colliders = colliders.take_modified();
         let mut removed_colliders = colliders.take_removed();
@@ -484,9 +489,9 @@ impl PhysicsPipeline {
     }
 
     /// Executes one timestep of the physics simulation.
-    pub fn step_generic<Bodies, Colliders>(
+    pub fn step_generic<Bodies, Colliders, Gravity>(
         &mut self,
-        gravity: &Vector<Real>,
+        gravity: &Gravity,
         integration_parameters: &IntegrationParameters,
         islands: &mut IslandManager,
         broad_phase: &mut BroadPhase,
@@ -521,6 +526,7 @@ impl PhysicsPipeline {
             + ComponentSet<ColliderType>
             + ComponentSet<ColliderGroups>
             + ComponentSet<ColliderMaterial>,
+        Gravity: self::Gravity,
     {
         self.counters.reset();
         self.counters.step_started();
@@ -703,6 +709,7 @@ mod test {
         CCDSolver, IntegrationParameters, IslandManager, JointSet, RigidBodyBuilder, RigidBodySet,
     };
     use crate::geometry::{BroadPhase, ColliderBuilder, ColliderSet, NarrowPhase};
+    use crate::gravity::Uniform;
     use crate::math::Vector;
     use crate::pipeline::PhysicsPipeline;
 
@@ -727,7 +734,7 @@ mod test {
         colliders.insert(co, h2, &mut bodies);
 
         pipeline.step(
-            &Vector::zeros(),
+            &Uniform::default(),
             &IntegrationParameters::default(),
             &mut islands,
             &mut bf,
@@ -773,7 +780,7 @@ mod test {
         }
 
         pipeline.step(
-            &Vector::zeros(),
+            &(),
             &IntegrationParameters::default(),
             &mut islands,
             &mut bf,
@@ -823,7 +830,7 @@ mod test {
     #[test]
     fn collider_removal_before_step() {
         let mut pipeline = PhysicsPipeline::new();
-        let gravity = Vector::y() * -9.81;
+        let gravity = Uniform::new(Vector::y() * -9.81);
         let integration_parameters = IntegrationParameters::default();
         let mut broad_phase = BroadPhase::new();
         let mut narrow_phase = NarrowPhase::new();

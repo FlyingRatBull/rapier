@@ -24,6 +24,7 @@ use rapier::dynamics::{
 use rapier::geometry::{ColliderHandle, ColliderSet, NarrowPhase};
 #[cfg(feature = "dim3")]
 use rapier::geometry::{InteractionGroups, Ray};
+use rapier::gravity::Gravity;
 use rapier::math::Vector;
 use rapier::pipeline::PhysicsHooks;
 
@@ -227,7 +228,7 @@ impl Testbed {
         &mut self.harness.physics.integration_parameters
     }
 
-    pub fn physics_state_mut(&mut self) -> &mut PhysicsState {
+    pub fn physics_state_mut(&mut self) -> &mut PhysicsState<Box<dyn Gravity>> {
         &mut self.harness.physics
     }
 
@@ -387,7 +388,7 @@ impl Testbed {
         F: FnMut(
                 Option<&mut Window>,
                 Option<&mut GraphicsManager>,
-                &mut PhysicsState,
+                &mut PhysicsState<Box<dyn Gravity>>,
                 &PhysicsEvents,
                 &RunState,
             ) + 'static,

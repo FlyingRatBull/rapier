@@ -132,6 +132,7 @@ pub mod counters;
 pub mod data;
 pub mod dynamics;
 pub mod geometry;
+pub mod gravity;
 pub mod pipeline;
 pub mod utils;
 

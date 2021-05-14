@@ -6,6 +6,7 @@ use kiss3d::window::Window;
 use plugin::HarnessPlugin;
 use rapier::dynamics::{CCDSolver, IntegrationParameters, IslandManager, JointSet, RigidBodySet};
 use rapier::geometry::{BroadPhase, ColliderSet, NarrowPhase};
+use rapier::gravity::{Gravity, Uniform};
 use rapier::math::Vector;
 use rapier::pipeline::{ChannelEventCollector, PhysicsHooks, PhysicsPipeline, QueryPipeline};
 
@@ -43,7 +44,7 @@ impl RunState {
 }
 
 pub struct Harness {
-    pub physics: PhysicsState,
+    pub physics: PhysicsState<Box<dyn Gravity>>,
     max_steps: usize,
     callbacks: Callbacks,
     plugins: Vec<Box<dyn HarnessPlugin>>,
@@ -57,7 +58,7 @@ type Callbacks = Vec<
         dyn FnMut(
             Option<&mut Window>,
             Option<&mut GraphicsManager>,
-            &mut PhysicsState,
+            &mut PhysicsState<Box<dyn Gravity>>,
             &PhysicsEvents,
             &RunState,
         ),
@@ -74,7 +75,8 @@ impl Harness {
             contact_events: contact_channel.1,
             intersection_events: proximity_channel.1,
         };
-        let physics = PhysicsState::new();
+        let gravity : Box<dyn Gravity> = Box::new(Uniform::default());
+        let physics = PhysicsState::new(gravity);
         let state = RunState::new();
 
         Self {
@@ -106,7 +108,7 @@ impl Harness {
         self.callbacks.clear();
     }
 
-    pub fn physics_state_mut(&mut self) -> &mut PhysicsState {
+    pub fn physics_state_mut(&mut self) -> &mut PhysicsState<Box<dyn Gravity>> {
         &mut self.physics
     }
 
@@ -124,7 +126,7 @@ impl Harness {
     ) {
         // println!("Num bodies: {}", bodies.len());
         // println!("Num joints: {}", joints.len());
-        self.physics.gravity = gravity;
+        self.physics.gravity = Box::new(Uniform::new(gravity));
         self.physics.bodies = bodies;
         self.physics.colliders = colliders;
         self.physics.joints = joints;
@@ -148,7 +150,7 @@ impl Harness {
         F: FnMut(
                 Option<&mut Window>,
                 Option<&mut GraphicsManager>,
-                &mut PhysicsState,
+                &mut PhysicsState<Box<dyn Gravity>>,
                 &PhysicsEvents,
                 &RunState,
             ) + 'static,
